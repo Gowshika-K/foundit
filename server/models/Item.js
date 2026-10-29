@@ -1,24 +1,17 @@
 const mongoose = require('mongoose');
 
 const itemSchema = new mongoose.Schema({
-  type: { type: String, enum: ['lost', 'found'], required: true },
-  title: { type: String, required: true, trim: true },
+  type: { type: String, required: true }, // 'Lost' or 'Found'
+  title: { type: String, required: true },
   description: { type: String, required: true },
-  category: { 
-    type: String, 
-    required: true, 
-    enum: ['Wallet', 'Phone', 'ID Card', 'Keys', 'Bag', 'Books', 'Electronics', 'Other'] 
-  },
-  location: { 
-    type: String, 
-    required: true, 
-    enum: ['Library', 'Canteen', 'Hostel', 'Bus Stop', 'Ground', 'Classroom', 'Admin Block', 'Other'] 
-  },
-  date: { type: Date, required: true },
-  image: { type: String, default: '' },
+  category: { type: String, required: true },
+  location: { type: String, required: true },
+  date: { type: String, required: true },
+  phone: { type: String, default: '' }, // New field for phone/WhatsApp
   verifyQuestion: { type: String, required: true },
-  verifyAnswer: { type: String, required: true, trim: true, lowercase: true },
-  status: { type: String, enum: ['Open', 'Claimed', 'Returned'], default: 'Open' },
+  verifyAnswer: { type: String, required: true },
+  image: { type: String, default: '' },
+  status: { type: String, default: 'Open' }, // 'Open', 'Claimed'
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 

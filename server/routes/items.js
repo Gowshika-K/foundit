@@ -1,11 +1,10 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const Item = require('../models/Item');
 const auth = require('../middleware/auth');
 
-// Image Upload Config
 const storage = multer.diskStorage({
   destination: './uploads/',
   filename: (req, file, cb) => {
@@ -14,40 +13,68 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// 1. Create new Lost/Found Item
 router.post('/', auth, upload.single('image'), async (req, res) => {
   try {
-    const { type, title, description, category, location, date, verifyQuestion, verifyAnswer } = req.body;
+    const { type, title, description, category, location, date, phone, verifyQuestion, question, verifyAnswer } = req.body;
     const newItem = new Item({
-      type, title, description, category, location, date, verifyQuestion,
+      type,
+      title,
+      description,
+      category,
+      location,
+      date,
+      phone: phone || '',
+      verifyQuestion: verifyQuestion || question || '',
       verifyAnswer: (verifyAnswer || '').toLowerCase().trim(),
       postedBy: req.user.userId,
       image: req.file ? `/uploads/${req.file.filename}` : ''
     });
     await newItem.save();
     res.status(201).json({ message: 'Item posted successfully!', item: newItem });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 2. Get All Items
 router.get('/', async (req, res) => {
   try {
-    const items = await Item.find().populate('postedBy', 'name email').sort({ createdAt: -1 });
+    const { type, category, search } = req.query;
+    const filter = {};
+
+    if (type && type !== 'All') {
+      filter.type = new RegExp(`^${type}$`, 'i');
+    }
+    if (category && category !== 'All') {
+      filter.category = new RegExp(`^${category.trim()}$`, 'i');
+    }
+    if (search && search.trim() !== '') {
+      const regex = new RegExp(search.trim(), 'i');
+      filter.$or = [
+        { title: regex },
+        { description: regex },
+        { location: regex },
+        { category: regex }
+      ];
+    }
+
+    const items = await Item.find(filter).populate('postedBy', 'name email').sort({ createdAt: -1 });
     res.json(items);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 3. Get Items Posted by User (Supports both /myposts and /my-posts)
 const getMyPosts = async (req, res) => {
   try {
     const items = await Item.find({ postedBy: req.user.userId }).sort({ createdAt: -1 });
     res.json(items);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 router.get('/myposts', auth, getMyPosts);
 router.get('/my-posts', auth, getMyPosts);
 
-// 4. Get Top 3 Suggested Matches for an Item
 router.get('/:id/matches', async (req, res) => {
   try {
     const currentItem = await Item.findById(req.params.id);
@@ -65,26 +92,30 @@ router.get('/:id/matches', async (req, res) => {
     }).filter(m => m.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore).slice(0, 3);
 
     res.json(scored);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 5. Get Single Item by ID
 router.get('/:id', async (req, res) => {
   try {
     const item = await Item.findById(req.params.id).populate('postedBy', 'name email');
     if (!item) return res.status(404).json({ message: 'Item not found' });
     res.json(item);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 6. Delete Item by ID
 router.delete('/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found' });
     await Item.findByIdAndDelete(req.params.id);
     res.json({ message: 'Item deleted successfully' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
