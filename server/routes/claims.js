@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const Claim = require('../models/Claim');
 const Item = require('../models/Item');
@@ -14,8 +14,6 @@ const handleClaim = async (req, res) => {
 
     const givenClean = rawAnswer.toString().toLowerCase().trim();
     const expectedClean = (item.verifyAnswer || '').toString().toLowerCase().trim();
-
-    console.log("?? Typed Answer:", givenClean, "| ? Expected DB Answer:", expectedClean);
 
     const isCorrect = (givenClean === expectedClean) || (givenClean.length > 0 && (expectedClean.includes(givenClean) || givenClean.includes(expectedClean)));
 
@@ -35,14 +33,14 @@ const handleClaim = async (req, res) => {
         message: 'Answer is correct! You have successfully claimed this item.',
         contact: {
           name: item.postedBy ? item.postedBy.name : 'Finder',
-          email: item.postedBy ? item.postedBy.email : 'Not available'
+          email: item.postedBy ? item.postedBy.email : 'Not available',
+          phone: item.phone || 'Not provided'
         }
       });
     } else {
       return res.status(400).json({ success: false, message: 'Incorrect answer. Try again!' });
     }
   } catch (err) {
-    console.error("CLAIM ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };
