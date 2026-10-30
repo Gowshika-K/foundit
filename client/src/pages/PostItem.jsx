@@ -1,208 +1,83 @@
-﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import React, { useState, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import API from '../api';
+import { AuthContext } from '../context/AuthContext';
+import { User, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 
-export default function PostItem() {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    type: 'Lost',
-    title: '',
-    description: '',
-    category: '',
-    location: '',
-    date: new Date().toISOString().split('T')[0],
-    phone: '',
-    verifyQuestion: '',
-    verifyAnswer: ''
-  });
-  const [image, setImage] = useState(null);
+export default function Login() {
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setLoading(true);
 
     try {
-      const data = new FormData();
-      data.append('type', formData.type);
-      data.append('title', formData.title);
-      data.append('description', formData.description);
-      data.append('category', formData.category);
-      data.append('location', formData.location);
-      data.append('date', formData.date);
-      data.append('phone', formData.phone);
-      data.append('verifyQuestion', formData.verifyQuestion);
-      data.append('question', formData.verifyQuestion);
-      data.append('verifyAnswer', formData.verifyAnswer);
-      if (image) {
-        data.append('image', image);
-      }
-
-      await API.post('/items', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
+      const res = await API.post('/auth/login', formData);
+      login(res.data.user, res.data.token);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to post item');
+      setError(err.response?.data?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container" style={{ maxWidth: '560px', margin: '2rem auto' }}>
-      <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#0f172a' }}>Post an Item</h2>
-
-        {error && <div style={{ color: '#dc2626', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Item Type</label>
-            <select name="type" value={formData.type} onChange={handleChange} className="form-control" style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <option value="Lost">Lost (I lost this item)</option>
-              <option value="Found">Found (I found this item)</option>
-            </select>
+    <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+      <div style={{ width: '100%', maxWidth: '440px', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0', boxShadow: '0 12px 35px -5px rgba(15, 23, 42, 0.08)', padding: '2.5rem' }}>
+        
+        {/* Header Icon */}
+        <div style={{ textAlign: 'center', marginBottom: '1.8rem' }}>
+          <div style={{ width: '56px', height: '56px', margin: '0 auto 0.8rem', background: '#e0e7ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5' }}>
+            <User size={28} />
           </div>
+          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px' }}>Student Login</h2>
+          <p style={{ color: '#64748b', fontSize: '0.88rem', marginTop: '0.3rem' }}>Access your campus lost & found account</p>
+        </div>
 
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Title</label>
-            <input
-              type="text"
-              name="title"
-              placeholder="e.g. Black Titan Wallet"
-              value={formData.title}
-              onChange={handleChange}
-              required
-              className="form-control"
-              style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-            />
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fee2e2', border: '1px solid #fecdd3', color: '#b91c1c', padding: '0.75rem 1rem', borderRadius: '10px', marginBottom: '1.2rem', fontSize: '0.88rem' }}>
+            <AlertCircle size={18} />
+            <span>{error}</span>
           </div>
+        )}
 
-          <div className="form-group" style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Description</label>
-            <textarea
-              name="description"
-              placeholder="Describe color, brand, distinct scratches, contents..."
-              value={formData.description}
-              onChange={handleChange}
-              rows="3"
-              required
-              className="form-control"
-              style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-            <div className="form-group">
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Category</label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: '0.4rem' }}>
+              College Email
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Mail size={18} style={{ position: 'absolute', top: '13px', left: '12px', color: '#94a3b8' }} />
               <input
-                type="text"
-                name="category"
-                placeholder="e.g. Wallet, Bag, Keys, ID Card"
-                value={formData.category}
-                onChange={handleChange}
+                type="email"
                 required
-                className="form-control"
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Location</label>
-              <input
-                type="text"
-                name="location"
-                placeholder="e.g. Ground floor guard cabin"
-                value={formData.location}
-                onChange={handleChange}
-                required
-                className="form-control"
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                placeholder="student@college.edu"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.95rem', outline: 'none' }}
               />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-            <div className="form-group">
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Contact Number (Phone / WhatsApp)</label>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: '0.4rem' }}>
+              Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Lock size={18} style={{ position: 'absolute', top: '13px', left: '12px', color: '#94a3b8' }} />
               <input
-                type="tel"
-                name="phone"
-                placeholder="e.g. 9876543210"
-                value={formData.phone}
-                onChange={handleChange}
+                type="password"
                 required
-                className="form-control"
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Date Lost/Found</label>
-              <input
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                required
-                className="form-control"
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
-            </div>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '1.2rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Upload Photo</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImage(e.target.files[0])}
-              className="form-control"
-              style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-            />
-          </div>
-
-          <div style={{ background: '#f8fafc', padding: '1.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a', marginBottom: '0.2rem' }}>
-              Secret Verification (Ownership Check)
-            </div>
-            <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
-              Set a question only the true owner can answer before seeing your contact info.
-            </p>
-
-            <div className="form-group" style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Question</label>
-              <input
-                type="text"
-                name="verifyQuestion"
-                placeholder="e.g. What picture is inside the ID card slot?"
-                value={formData.verifyQuestion}
-                onChange={handleChange}
-                required
-                className="form-control"
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.4rem' }}>Correct Answer (Secret)</label>
-              <input
-                type="text"
-                name="verifyAnswer"
-                placeholder="e.g. Cat sticker"
-                value={formData.verifyAnswer}
-                onChange={handleChange}
-                required
-                className="form-control"
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff' }}
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.95rem', outline: 'none' }}
               />
             </div>
           </div>
@@ -210,11 +85,32 @@ export default function PostItem() {
           <button
             type="submit"
             disabled={loading}
-            style={{ width: '100%', padding: '0.75rem', background: '#4f46e5', color: '#fff', fontWeight: 600, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.95rem' }}
+            style={{
+              padding: '0.85rem',
+              borderRadius: '12px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              color: '#ffffff',
+              fontSize: '1rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
+              marginTop: '0.4rem',
+            }}
           >
-            {loading ? 'Posting...' : 'Post Item Now'}
+            {loading ? 'Logging in...' : 'Login as Student'}
           </button>
         </form>
+
+        <p style={{ marginTop: '1.4rem', textAlign: 'center', fontSize: '0.88rem', color: '#64748b' }}>
+          Don't have an account? <Link to="/register" style={{ color: '#4f46e5', fontWeight: 700, textDecoration: 'none' }}>Register</Link>
+        </p>
+
+        <div style={{ marginTop: '1.6rem', paddingTop: '1.2rem', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+          <Link to="/admin-login" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#8b5cf6', fontWeight: 700, textDecoration: 'none' }}>
+            🛡️ Authorized Admin Portal Login <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
     </div>
   );
