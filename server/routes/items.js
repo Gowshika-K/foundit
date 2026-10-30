@@ -1,21 +1,29 @@
 ﻿const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
 const Item = require('../models/Item');
-const auth = require('../middleware/auth');
+const User = require('../models/User');
+const { auth, adminOnly } = require('../middleware/auth');
+const { scoreMatch } = require('../utils/matcher');
 
+// Configure Multer Storage for Image Uploads
 const storage = multer.diskStorage({
-  destination: './uploads/',
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'), false);
   }
 });
-const upload = multer({ storage });
 
+// 1. Post an Item (Student or Admin)
 router.post('/', auth, upload.single('image'), async (req, res) => {
   try {
-    const { type, title, description, category, location, date, phone, verifyQuestion, question, verifyAnswer } = req.body;
+    const { type, title, description, category, location, date, timeFound, contactPhone } = req.body;
     const newItem = new Item({
       type,
       title,
@@ -23,98 +31,124 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
       category,
       location,
       date,
-      phone: phone || '',
-      verifyQuestion: verifyQuestion || question || '',
-      verifyAnswer: (verifyAnswer || '').toLowerCase().trim(),
-      postedBy: req.user.userId,
-      image: req.file ? `/uploads/${req.file.filename}` : ''
+      timeFound: timeFound || '12:00',
+      contactPhone: contactPhone || '',
+      image: req.file ? `/uploads/${req.file.filename}` : '',
+      status: 'Open',
+      postedBy: req.user.id
     });
-    await newItem.save();
-    res.status(201).json({ message: 'Item posted successfully!', item: newItem });
+
+    const saved = await newItem.save();
+    res.status(201).json(saved);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message || 'Error posting item' });
   }
 });
 
+// 2. Admin Analytics Stats
+router.get('/admin/stats', auth, adminOnly, async (req, res) => {
+  try {
+    const totalItems = await Item.countDocuments();
+    const lostCount = await Item.countDocuments({ type: 'lost', status: 'Open' });
+    const foundCount = await Item.countDocuments({ type: 'found', status: 'Open' });
+    const totalUsers = await User.countDocuments();
+    res.json({ totalItems, lostCount, foundCount, totalUsers });
+  } catch (err) {
+    res.status(500).json({ message: 'Error loading admin stats' });
+  }
+});
+
+// 3. Get Items (Hides returned/found items unless Admin showAll=true is passed!)
 router.get('/', async (req, res) => {
   try {
-    const { type, category, search } = req.query;
-    const filter = {};
+    const { type, category, search, showAll } = req.query;
+    let query = {};
 
-    if (type && type !== 'All') {
-      filter.type = new RegExp(`^${type}$`, 'i');
+    // If regular public user, ONLY show active 'Open' items!
+    if (showAll !== 'true') {
+      query.status = 'Open';
     }
-    if (category && category !== 'All') {
-      filter.category = new RegExp(`^${category.trim()}$`, 'i');
-    }
-    if (search && search.trim() !== '') {
-      const regex = new RegExp(search.trim(), 'i');
-      filter.$or = [
-        { title: regex },
-        { description: regex },
-        { location: regex },
-        { category: regex }
+
+    if (type) query.type = type;
+    if (category && category !== 'All') query.category = category;
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
       ];
     }
 
-    const items = await Item.find(filter).populate('postedBy', 'name email').sort({ createdAt: -1 });
+    const items = await Item.find(query).populate('postedBy', 'name email').sort({ createdAt: -1 });
     res.json(items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: 'Error fetching items' });
   }
 });
 
-const getMyPosts = async (req, res) => {
+// 4. Admin Responsibility: Mark Item as Returned / Resolved (Takes it off the public feed!)
+router.patch('/:id/status', auth, adminOnly, async (req, res) => {
   try {
-    const items = await Item.find({ postedBy: req.user.userId }).sort({ createdAt: -1 });
-    res.json(items);
+    const { status } = req.body;
+    const item = await Item.findByIdAndUpdate(
+      req.params.id, 
+      { status: status || 'Returned' }, 
+      { new: true }
+    );
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+    res.json({ message: `Item marked as ${item.status}`, item });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: 'Error updating status' });
   }
-};
-router.get('/myposts', auth, getMyPosts);
-router.get('/my-posts', auth, getMyPosts);
+});
 
+// 5. Smart Matches for an Item (Top 3)
 router.get('/:id/matches', async (req, res) => {
   try {
-    const currentItem = await Item.findById(req.params.id);
-    if (!currentItem) return res.status(404).json({ message: 'Item not found' });
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Item not found' });
 
-    const oppositeType = currentItem.type === 'Lost' ? 'Found' : 'Lost';
-    const candidates = await Item.find({ _id: { $ne: currentItem._id }, type: oppositeType, status: 'Open' });
+    const oppositeType = item.type === 'lost' ? 'found' : 'lost';
+    const candidates = await Item.find({ type: oppositeType, status: 'Open', _id: { $ne: item._id } });
 
-    const scored = candidates.map(cand => {
-      let score = 0;
-      if (cand.category && currentItem.category && cand.category.toLowerCase() === currentItem.category.toLowerCase()) score += 40;
-      if (cand.location && currentItem.location && cand.location.toLowerCase().includes(currentItem.location.toLowerCase())) score += 30;
-      if (cand.title && currentItem.title && (cand.title.toLowerCase().includes(currentItem.title.toLowerCase()) || currentItem.title.toLowerCase().includes(cand.title.toLowerCase()))) score += 30;
-      return { ...cand.toObject(), matchScore: score };
-    }).filter(m => m.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore).slice(0, 3);
+    const scored = candidates.map(candidate => ({
+      item: candidate,
+      score: scoreMatch(item, candidate)
+    }))
+    .filter(match => match.score > 20)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
 
     res.json(scored);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: 'Error finding matches' });
   }
 });
 
+// 6. Get Single Item Details
 router.get('/:id', async (req, res) => {
   try {
     const item = await Item.findById(req.params.id).populate('postedBy', 'name email');
     if (!item) return res.status(404).json({ message: 'Item not found' });
     res.json(item);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: 'Error retrieving item' });
   }
 });
 
+// 7. Delete Item (Admin only or post owner)
 router.delete('/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found' });
+
+    if (item.postedBy.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden: You cannot delete this item' });
+    }
+
     await Item.findByIdAndDelete(req.params.id);
     res.json({ message: 'Item deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: 'Error deleting item' });
   }
 });
 

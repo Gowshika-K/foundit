@@ -20,7 +20,9 @@ export default function Board() {
       if (category !== 'All') query += `&category=${category}`;
 
       const res = await API.get(`/items${query}`);
-      setItems(res.data);
+      // Safety filter: ensure ONLY 'Open' items are displayed on public feed!
+      const activeItems = res.data.filter(item => item.status === 'Open');
+      setItems(activeItems);
     } catch (err) {
       console.error('Failed to load items', err);
     } finally {
@@ -45,7 +47,7 @@ export default function Board() {
           Campus <span style={{ color: '#4f46e5' }}>Lost & Found</span> Portal
         </h1>
         <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '600px', margin: '0 auto 1.8rem', lineHeight: '1.5' }}>
-          Report missing belongings or find lost items across campus libraries, hostels, labs, and grounds.
+          Real-time tracking for items reported across campus libraries, hostels, labs, and grounds.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.8rem', marginBottom: '2rem' }}>
@@ -82,31 +84,31 @@ export default function Board() {
               textDecoration: 'none',
             }}
           >
-            Browse Posts
+            Browse Active Posts
           </a>
         </div>
 
         {/* Stats Pills */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
           <div style={{ background: '#ffffff', padding: '0.6rem 1.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4f46e5' }}>{items.length} </span>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Total Reports</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Active Posts</span>
           </div>
           <div style={{ background: '#ffffff', padding: '0.6rem 1.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444' }}>{items.filter(i => i.type === 'lost').length} </span>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Lost Items</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Active Lost</span>
           </div>
           <div style={{ background: '#ffffff', padding: '0.6rem 1.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981' }}>{items.filter(i => i.type === 'found').length} </span>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Found Items</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Active Found</span>
           </div>
         </div>
       </div>
 
-      {/* Main Container */}
+      {/* Main Feed Container */}
       <div id="feed" style={{ maxWidth: '1140px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         
-        {/* Search & Filter Bar */}
+        {/* Search & Filter Toolbar */}
         <div style={{ background: '#ffffff', padding: '1.25rem', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)', marginBottom: '2rem' }}>
           <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.8rem', marginBottom: '1rem' }}>
             <div style={{ position: 'relative', flex: 1 }}>
@@ -127,7 +129,7 @@ export default function Board() {
             </button>
           </form>
 
-          {/* Toggle Pills & Category */}
+          {/* Type Toggle Pills & Category */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
@@ -190,13 +192,13 @@ export default function Board() {
           </div>
         </div>
 
-        {/* Cards Grid */}
+        {/* Dynamic Cards Grid */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Loading records...</div>
         ) : items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.4rem', color: '#0f172a' }}>No Items Found</h3>
-            <p style={{ color: '#64748b', marginBottom: '1.2rem', fontSize: '0.9rem' }}>Be the first student to post a lost or found report!</p>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.4rem', color: '#0f172a' }}>No Active Items Found</h3>
+            <p style={{ color: '#64748b', marginBottom: '1.2rem', fontSize: '0.9rem' }}>All previous items were returned or no records match your filter.</p>
             <Link
               to="/post"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: '#4f46e5', color: '#ffffff', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: 600, textDecoration: 'none' }}
@@ -250,8 +252,8 @@ export default function Board() {
                     >
                       {item.type}
                     </span>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: item.status === 'Open' ? '#10b981' : '#64748b' }}>
-                      ● {item.status}
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#10b981' }}>
+                      ● Active Report
                     </span>
                   </div>
 
